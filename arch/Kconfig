@@ -607,12 +607,6 @@ config CC_STACKPROTECTOR_STRONG
 
 endchoice
 
-config THIN_ARCHIVES
-	def_bool y
-	help
-	  Select this if the architecture wants to use thin archives
-	  instead of ld -r to create the built-in.o files.
-
 choice
 	prompt "Kernel linker"
 	default LD_BFD if !LTO_CLANG
@@ -684,7 +678,6 @@ config LTO_CLANG
 	depends on !FTRACE_MCOUNT_RECORD || HAVE_C_RECORDMCOUNT
 	depends on !KASAN
 	select LTO
-	select THIN_ARCHIVES
 	select LD_DEAD_CODE_DATA_ELIMINATION
 	select LD_GOLD
 	help
@@ -704,7 +697,6 @@ config LTO_GCC
 	depends on !GCOV_KERNEL
 	depends on !MODVERSIONS
 	select LTO
-	select THIN_ARCHIVES
 	select LD_DEAD_CODE_DATA_ELIMINATION
 	# lto does not support excluding flags for specific files
 	# right now. Can be removed if that is fixed.
