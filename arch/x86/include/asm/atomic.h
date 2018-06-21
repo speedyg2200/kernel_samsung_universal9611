@@ -1,312 +1,262 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-#ifndef _ALPHA_ATOMIC_H
-#define _ALPHA_ATOMIC_H
+#ifndef _ASM_X86_ATOMIC_H
+#define _ASM_X86_ATOMIC_H
 
+#include <linux/compiler.h>
 #include <linux/types.h>
-#include <asm/barrier.h>
+#include <asm/alternative.h>
 #include <asm/cmpxchg.h>
+#include <asm/rmwcc.h>
+#include <asm/barrier.h>
 
 /*
  * Atomic operations that C can't guarantee us.  Useful for
- * resource counting etc...
- *
- * But use these as seldom as possible since they are much slower
- * than regular operations.
+ * resource counting etc..
  */
 
-
-#define ATOMIC_INIT(i)		{ (i) }
-#define ATOMIC64_INIT(i)	{ (i) }
-
-#define atomic_read(v)		READ_ONCE((v)->counter)
-#define atomic64_read(v)	READ_ONCE((v)->counter)
-
-#define atomic_set(v,i)		WRITE_ONCE((v)->counter, (i))
-#define atomic64_set(v,i)	WRITE_ONCE((v)->counter, (i))
-
-/*
- * To get proper branch prediction for the main line, we must branch
- * forward to code at the end of this object's .text section, then
- * branch back to restart the operation.
- */
-
-#define ATOMIC_OP(op, asm_op)						\
-static __inline__ void atomic_##op(int i, atomic_t * v)			\
-{									\
-	unsigned long temp;						\
-	__asm__ __volatile__(						\
-	"1:	ldl_l %0,%1\n"						\
-	"	" #asm_op " %0,%2,%0\n"					\
-	"	stl_c %0,%1\n"						\
-	"	beq %0,2f\n"						\
-	".subsection 2\n"						\
-	"2:	br 1b\n"						\
-	".previous"							\
-	:"=&r" (temp), "=m" (v->counter)				\
-	:"Ir" (i), "m" (v->counter));					\
-}									\
-
-#define ATOMIC_OP_RETURN(op, asm_op)					\
-static inline int atomic_##op##_return_relaxed(int i, atomic_t *v)	\
-{									\
-	long temp, result;						\
-	__asm__ __volatile__(						\
-	"1:	ldl_l %0,%1\n"						\
-	"	" #asm_op " %0,%3,%2\n"					\
-	"	" #asm_op " %0,%3,%0\n"					\
-	"	stl_c %0,%1\n"						\
-	"	beq %0,2f\n"						\
-	".subsection 2\n"						\
-	"2:	br 1b\n"						\
-	".previous"							\
-	:"=&r" (temp), "=m" (v->counter), "=&r" (result)		\
-	:"Ir" (i), "m" (v->counter) : "memory");			\
-	return result;							\
-}
-
-#define ATOMIC_FETCH_OP(op, asm_op)					\
-static inline int atomic_fetch_##op##_relaxed(int i, atomic_t *v)	\
-{									\
-	long temp, result;						\
-	__asm__ __volatile__(						\
-	"1:	ldl_l %2,%1\n"						\
-	"	" #asm_op " %2,%3,%0\n"					\
-	"	stl_c %0,%1\n"						\
-	"	beq %0,2f\n"						\
-	".subsection 2\n"						\
-	"2:	br 1b\n"						\
-	".previous"							\
-	:"=&r" (temp), "=m" (v->counter), "=&r" (result)		\
-	:"Ir" (i), "m" (v->counter) : "memory");			\
-	return result;							\
-}
-
-#define ATOMIC64_OP(op, asm_op)						\
-static __inline__ void atomic64_##op(long i, atomic64_t * v)		\
-{									\
-	unsigned long temp;						\
-	__asm__ __volatile__(						\
-	"1:	ldq_l %0,%1\n"						\
-	"	" #asm_op " %0,%2,%0\n"					\
-	"	stq_c %0,%1\n"						\
-	"	beq %0,2f\n"						\
-	".subsection 2\n"						\
-	"2:	br 1b\n"						\
-	".previous"							\
-	:"=&r" (temp), "=m" (v->counter)				\
-	:"Ir" (i), "m" (v->counter));					\
-}									\
-
-#define ATOMIC64_OP_RETURN(op, asm_op)					\
-static __inline__ long atomic64_##op##_return_relaxed(long i, atomic64_t * v)	\
-{									\
-	long temp, result;						\
-	__asm__ __volatile__(						\
-	"1:	ldq_l %0,%1\n"						\
-	"	" #asm_op " %0,%3,%2\n"					\
-	"	" #asm_op " %0,%3,%0\n"					\
-	"	stq_c %0,%1\n"						\
-	"	beq %0,2f\n"						\
-	".subsection 2\n"						\
-	"2:	br 1b\n"						\
-	".previous"							\
-	:"=&r" (temp), "=m" (v->counter), "=&r" (result)		\
-	:"Ir" (i), "m" (v->counter) : "memory");			\
-	return result;							\
-}
-
-#define ATOMIC64_FETCH_OP(op, asm_op)					\
-static __inline__ long atomic64_fetch_##op##_relaxed(long i, atomic64_t * v)	\
-{									\
-	long temp, result;						\
-	__asm__ __volatile__(						\
-	"1:	ldq_l %2,%1\n"						\
-	"	" #asm_op " %2,%3,%0\n"					\
-	"	stq_c %0,%1\n"						\
-	"	beq %0,2f\n"						\
-	".subsection 2\n"						\
-	"2:	br 1b\n"						\
-	".previous"							\
-	:"=&r" (temp), "=m" (v->counter), "=&r" (result)		\
-	:"Ir" (i), "m" (v->counter) : "memory");			\
-	return result;							\
-}
-
-#define ATOMIC_OPS(op)							\
-	ATOMIC_OP(op, op##l)						\
-	ATOMIC_OP_RETURN(op, op##l)					\
-	ATOMIC_FETCH_OP(op, op##l)					\
-	ATOMIC64_OP(op, op##q)						\
-	ATOMIC64_OP_RETURN(op, op##q)					\
-	ATOMIC64_FETCH_OP(op, op##q)
-
-ATOMIC_OPS(add)
-ATOMIC_OPS(sub)
-
-#define atomic_add_return_relaxed	atomic_add_return_relaxed
-#define atomic_sub_return_relaxed	atomic_sub_return_relaxed
-#define atomic_fetch_add_relaxed	atomic_fetch_add_relaxed
-#define atomic_fetch_sub_relaxed	atomic_fetch_sub_relaxed
-
-#define atomic64_add_return_relaxed	atomic64_add_return_relaxed
-#define atomic64_sub_return_relaxed	atomic64_sub_return_relaxed
-#define atomic64_fetch_add_relaxed	atomic64_fetch_add_relaxed
-#define atomic64_fetch_sub_relaxed	atomic64_fetch_sub_relaxed
-
-#define atomic_andnot atomic_andnot
-#define atomic64_andnot atomic64_andnot
-
-#undef ATOMIC_OPS
-#define ATOMIC_OPS(op, asm)						\
-	ATOMIC_OP(op, asm)						\
-	ATOMIC_FETCH_OP(op, asm)					\
-	ATOMIC64_OP(op, asm)						\
-	ATOMIC64_FETCH_OP(op, asm)
-
-ATOMIC_OPS(and, and)
-ATOMIC_OPS(andnot, bic)
-ATOMIC_OPS(or, bis)
-ATOMIC_OPS(xor, xor)
-
-#define atomic_fetch_and_relaxed	atomic_fetch_and_relaxed
-#define atomic_fetch_andnot_relaxed	atomic_fetch_andnot_relaxed
-#define atomic_fetch_or_relaxed		atomic_fetch_or_relaxed
-#define atomic_fetch_xor_relaxed	atomic_fetch_xor_relaxed
-
-#define atomic64_fetch_and_relaxed	atomic64_fetch_and_relaxed
-#define atomic64_fetch_andnot_relaxed	atomic64_fetch_andnot_relaxed
-#define atomic64_fetch_or_relaxed	atomic64_fetch_or_relaxed
-#define atomic64_fetch_xor_relaxed	atomic64_fetch_xor_relaxed
-
-#undef ATOMIC_OPS
-#undef ATOMIC64_FETCH_OP
-#undef ATOMIC64_OP_RETURN
-#undef ATOMIC64_OP
-#undef ATOMIC_FETCH_OP
-#undef ATOMIC_OP_RETURN
-#undef ATOMIC_OP
-
-#define atomic64_cmpxchg(v, old, new) (cmpxchg(&((v)->counter), old, new))
-#define atomic64_xchg(v, new) (xchg(&((v)->counter), new))
-
-#define atomic_cmpxchg(v, old, new) (cmpxchg(&((v)->counter), old, new))
-#define atomic_xchg(v, new) (xchg(&((v)->counter), new))
+#define ATOMIC_INIT(i)	{ (i) }
 
 /**
- * atomic_fetch_add_unless - add unless the number is a given value
+ * atomic_read - read atomic variable
  * @v: pointer of type atomic_t
- * @a: the amount to add to v...
- * @u: ...unless v is equal to u.
  *
- * Atomically adds @a to @v, so long as it was not @u.
- * Returns the old value of @v.
+ * Atomically reads the value of @v.
  */
-static __inline__ int atomic_fetch_add_unless(atomic_t *v, int a, int u)
+static __always_inline int atomic_read(const atomic_t *v)
 {
-	int c, new, old;
-	smp_mb();
-	__asm__ __volatile__(
-	"1:	ldl_l	%[old],%[mem]\n"
-	"	cmpeq	%[old],%[u],%[c]\n"
-	"	addl	%[old],%[a],%[new]\n"
-	"	bne	%[c],2f\n"
-	"	stl_c	%[new],%[mem]\n"
-	"	beq	%[new],3f\n"
-	"2:\n"
-	".subsection 2\n"
-	"3:	br	1b\n"
-	".previous"
-	: [old] "=&r"(old), [new] "=&r"(new), [c] "=&r"(c)
-	: [mem] "m"(*v), [a] "rI"(a), [u] "rI"((long)u)
-	: "memory");
-	smp_mb();
-	return old;
+	/*
+	 * Note for KASAN: we deliberately don't use READ_ONCE_NOCHECK() here,
+	 * it's non-inlined function that increases binary size and stack usage.
+	 */
+	return READ_ONCE((v)->counter);
 }
-
 
 /**
- * atomic64_add_unless - add unless the number is a given value
- * @v: pointer of type atomic64_t
- * @a: the amount to add to v...
- * @u: ...unless v is equal to u.
+ * atomic_set - set atomic variable
+ * @v: pointer of type atomic_t
+ * @i: required value
  *
- * Atomically adds @a to @v, so long as it was not @u.
- * Returns true iff @v was not @u.
+ * Atomically sets the value of @v to @i.
  */
-static __inline__ int atomic64_add_unless(atomic64_t *v, long a, long u)
+static __always_inline void atomic_set(atomic_t *v, int i)
 {
-	long c, tmp;
-	smp_mb();
-	__asm__ __volatile__(
-	"1:	ldq_l	%[tmp],%[mem]\n"
-	"	cmpeq	%[tmp],%[u],%[c]\n"
-	"	addq	%[tmp],%[a],%[tmp]\n"
-	"	bne	%[c],2f\n"
-	"	stq_c	%[tmp],%[mem]\n"
-	"	beq	%[tmp],3f\n"
-	"2:\n"
-	".subsection 2\n"
-	"3:	br	1b\n"
-	".previous"
-	: [tmp] "=&r"(tmp), [c] "=&r"(c)
-	: [mem] "m"(*v), [a] "rI"(a), [u] "rI"(u)
-	: "memory");
-	smp_mb();
-	return !c;
+	WRITE_ONCE(v->counter, i);
 }
 
-/*
- * atomic64_dec_if_positive - decrement by 1 if old value positive
+/**
+ * atomic_add - add integer to atomic variable
+ * @i: integer value to add
  * @v: pointer of type atomic_t
  *
- * The function returns the old value of *v minus 1, even if
- * the atomic variable, v, was not decremented.
+ * Atomically adds @i to @v.
  */
-static inline long atomic64_dec_if_positive(atomic64_t *v)
+static __always_inline void atomic_add(int i, atomic_t *v)
 {
-	long old, tmp;
-	smp_mb();
-	__asm__ __volatile__(
-	"1:	ldq_l	%[old],%[mem]\n"
-	"	subq	%[old],1,%[tmp]\n"
-	"	ble	%[old],2f\n"
-	"	stq_c	%[tmp],%[mem]\n"
-	"	beq	%[tmp],3f\n"
-	"2:\n"
-	".subsection 2\n"
-	"3:	br	1b\n"
-	".previous"
-	: [old] "=&r"(old), [tmp] "=&r"(tmp)
-	: [mem] "m"(*v)
-	: "memory");
-	smp_mb();
-	return old - 1;
+	asm volatile(LOCK_PREFIX "addl %1,%0"
+		     : "+m" (v->counter)
+		     : "ir" (i) : "memory");
 }
 
-#define atomic64_inc_not_zero(v) atomic64_add_unless((v), 1, 0)
+/**
+ * atomic_sub - subtract integer from atomic variable
+ * @i: integer value to subtract
+ * @v: pointer of type atomic_t
+ *
+ * Atomically subtracts @i from @v.
+ */
+static __always_inline void atomic_sub(int i, atomic_t *v)
+{
+	asm volatile(LOCK_PREFIX "subl %1,%0"
+		     : "+m" (v->counter)
+		     : "ir" (i) : "memory");
+}
 
-#define atomic_add_negative(a, v) (atomic_add_return((a), (v)) < 0)
-#define atomic64_add_negative(a, v) (atomic64_add_return((a), (v)) < 0)
+/**
+ * atomic_sub_and_test - subtract value from variable and test result
+ * @i: integer value to subtract
+ * @v: pointer of type atomic_t
+ *
+ * Atomically subtracts @i from @v and returns
+ * true if the result is zero, or false for all
+ * other cases.
+ */
+static __always_inline bool atomic_sub_and_test(int i, atomic_t *v)
+{
+	GEN_BINARY_RMWcc(LOCK_PREFIX "subl", v->counter, "er", i, "%0", e);
+}
 
-#define atomic_dec_return(v) atomic_sub_return(1,(v))
-#define atomic64_dec_return(v) atomic64_sub_return(1,(v))
+/**
+ * atomic_inc - increment atomic variable
+ * @v: pointer of type atomic_t
+ *
+ * Atomically increments @v by 1.
+ */
+static __always_inline void atomic_inc(atomic_t *v)
+{
+	asm volatile(LOCK_PREFIX "incl %0"
+		     : "+m" (v->counter) :: "memory");
+}
 
-#define atomic_inc_return(v) atomic_add_return(1,(v))
-#define atomic64_inc_return(v) atomic64_add_return(1,(v))
+/**
+ * atomic_dec - decrement atomic variable
+ * @v: pointer of type atomic_t
+ *
+ * Atomically decrements @v by 1.
+ */
+static __always_inline void atomic_dec(atomic_t *v)
+{
+	asm volatile(LOCK_PREFIX "decl %0"
+		     : "+m" (v->counter) :: "memory");
+}
 
-#define atomic_sub_and_test(i,v) (atomic_sub_return((i), (v)) == 0)
-#define atomic64_sub_and_test(i,v) (atomic64_sub_return((i), (v)) == 0)
+/**
+ * atomic_dec_and_test - decrement and test
+ * @v: pointer of type atomic_t
+ *
+ * Atomically decrements @v by 1 and
+ * returns true if the result is 0, or false for all other
+ * cases.
+ */
+static __always_inline bool atomic_dec_and_test(atomic_t *v)
+{
+	GEN_UNARY_RMWcc(LOCK_PREFIX "decl", v->counter, "%0", e);
+}
 
-#define atomic_inc_and_test(v) (atomic_add_return(1, (v)) == 0)
-#define atomic64_inc_and_test(v) (atomic64_add_return(1, (v)) == 0)
+/**
+ * atomic_inc_and_test - increment and test
+ * @v: pointer of type atomic_t
+ *
+ * Atomically increments @v by 1
+ * and returns true if the result is zero, or false for all
+ * other cases.
+ */
+static __always_inline bool atomic_inc_and_test(atomic_t *v)
+{
+	GEN_UNARY_RMWcc(LOCK_PREFIX "incl", v->counter, "%0", e);
+}
 
-#define atomic_dec_and_test(v) (atomic_sub_return(1, (v)) == 0)
-#define atomic64_dec_and_test(v) (atomic64_sub_return(1, (v)) == 0)
+/**
+ * atomic_add_negative - add and test if negative
+ * @i: integer value to add
+ * @v: pointer of type atomic_t
+ *
+ * Atomically adds @i to @v and returns true
+ * if the result is negative, or false when
+ * result is greater than or equal to zero.
+ */
+static __always_inline bool atomic_add_negative(int i, atomic_t *v)
+{
+	GEN_BINARY_RMWcc(LOCK_PREFIX "addl", v->counter, "er", i, "%0", s);
+}
 
-#define atomic_inc(v) atomic_add(1,(v))
-#define atomic64_inc(v) atomic64_add(1,(v))
+/**
+ * atomic_add_return - add integer and return
+ * @i: integer value to add
+ * @v: pointer of type atomic_t
+ *
+ * Atomically adds @i to @v and returns @i + @v
+ */
+static __always_inline int atomic_add_return(int i, atomic_t *v)
+{
+	return i + xadd(&v->counter, i);
+}
 
-#define atomic_dec(v) atomic_sub(1,(v))
-#define atomic64_dec(v) atomic64_sub(1,(v))
+/**
+ * atomic_sub_return - subtract integer and return
+ * @v: pointer of type atomic_t
+ * @i: integer value to subtract
+ *
+ * Atomically subtracts @i from @v and returns @v - @i
+ */
+static __always_inline int atomic_sub_return(int i, atomic_t *v)
+{
+	return atomic_add_return(-i, v);
+}
 
-#endif /* _ALPHA_ATOMIC_H */
+#define atomic_inc_return(v)  (atomic_add_return(1, v))
+#define atomic_dec_return(v)  (atomic_sub_return(1, v))
+
+static __always_inline int atomic_fetch_add(int i, atomic_t *v)
+{
+	return xadd(&v->counter, i);
+}
+
+static __always_inline int atomic_fetch_sub(int i, atomic_t *v)
+{
+	return xadd(&v->counter, -i);
+}
+
+static __always_inline int atomic_cmpxchg(atomic_t *v, int old, int new)
+{
+	return cmpxchg(&v->counter, old, new);
+}
+
+#define atomic_try_cmpxchg atomic_try_cmpxchg
+static __always_inline bool atomic_try_cmpxchg(atomic_t *v, int *old, int new)
+{
+	return try_cmpxchg(&v->counter, old, new);
+}
+
+static inline int atomic_xchg(atomic_t *v, int new)
+{
+	return arch_xchg(&v->counter, new);
+}
+
+static inline void atomic_and(int i, atomic_t *v)
+{
+	asm volatile(LOCK_PREFIX "andl %1,%0"
+			: "+m" (v->counter)
+			: "ir" (i)
+			: "memory");
+}
+
+static inline int atomic_fetch_and(int i, atomic_t *v)
+{
+	int val = atomic_read(v);
+
+	do { } while (!atomic_try_cmpxchg(v, &val, val & i));
+
+	return val;
+}
+
+static inline void atomic_or(int i, atomic_t *v)
+{
+	asm volatile(LOCK_PREFIX "orl %1,%0"
+			: "+m" (v->counter)
+			: "ir" (i)
+			: "memory");
+}
+
+static inline int atomic_fetch_or(int i, atomic_t *v)
+{
+	int val = atomic_read(v);
+
+	do { } while (!atomic_try_cmpxchg(v, &val, val | i));
+
+	return val;
+}
+
+static inline void atomic_xor(int i, atomic_t *v)
+{
+	asm volatile(LOCK_PREFIX "xorl %1,%0"
+			: "+m" (v->counter)
+			: "ir" (i)
+			: "memory");
+}
+
+static inline int atomic_fetch_xor(int i, atomic_t *v)
+{
+	int val = atomic_read(v);
+
+	do { } while (!atomic_try_cmpxchg(v, &val, val ^ i));
+
+	return val;
+}
+
+#ifdef CONFIG_X86_32
+# include <asm/atomic64_32.h>
+#else
+# include <asm/atomic64_64.h>
+#endif
+
+#endif /* _ASM_X86_ATOMIC_H */
