@@ -3052,7 +3052,7 @@ static int selinux_inode_init_security_anon(struct inode *inode,
 					    const struct qstr *name,
 					    const struct inode *context_inode)
 {
-	const struct task_security_struct *tsec = current_security();
+	const struct task_security_struct *tsec = selinux_cred(current_cred());
 	struct common_audit_data ad;
 	struct inode_security_struct *isec;
 	int rc;
@@ -3060,7 +3060,7 @@ static int selinux_inode_init_security_anon(struct inode *inode,
 	if (unlikely(!selinux_initialized(&selinux_state)))
 		return 0;
 
-	isec = inode->i_security;
+	isec = selinux_inode(inode);
 
 	/*
 	 * We only get here once per ephemeral inode.  The inode has
@@ -3070,7 +3070,7 @@ static int selinux_inode_init_security_anon(struct inode *inode,
 
 	if (context_inode) {
 		struct inode_security_struct *context_isec =
-			context_inode->i_security;
+			selinux_inode(context_inode);
 		if (context_isec->initialized != LABEL_INITIALIZED) {
 			pr_err("SELinux:  context_inode is not initialized");
 			return -EACCES;
