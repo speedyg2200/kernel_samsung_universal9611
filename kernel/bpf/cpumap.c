@@ -323,6 +323,9 @@ static int cpu_map_bpf_prog_run_xdp(struct bpf_cpu_map_entry *rcpu,
 		}
 	}
 
+	if (stats->redirect)
+		xdp_do_flush();
+
 	xdp_clear_return_frame_no_direct();
 
 	rcu_read_unlock_bh(); /* resched point, may call do_softirq() */
@@ -330,8 +333,8 @@ static int cpu_map_bpf_prog_run_xdp(struct bpf_cpu_map_entry *rcpu,
 }
 
 static int cpu_map_bpf_prog_run(struct bpf_cpu_map_entry *rcpu, void **frames,
-				int xdp_n, struct xdp_cpumap_stats *stats,
-				struct list_head *list)
+								int xdp_n, struct xdp_cpumap_stats *stats,
+								struct list_head *list)
 {
 	int nframes;
 
@@ -342,13 +345,11 @@ static int cpu_map_bpf_prog_run(struct bpf_cpu_map_entry *rcpu, void **frames,
 
 	nframes = cpu_map_bpf_prog_run_xdp(rcpu, frames, xdp_n, stats);
 
-	if (stats->redirect)
-		xdp_do_flush();
-
 	if (unlikely(!list_empty(list)))
 		cpu_map_bpf_prog_run_skb(rcpu, list, stats);
 
 	rcu_read_unlock_bh();
+
 	return nframes;
 }
 
