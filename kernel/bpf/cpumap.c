@@ -301,9 +301,6 @@ static int cpu_map_bpf_prog_run_xdp(struct bpf_cpu_map_entry *rcpu,
 			}
 			break;
 
-		default:
-			bpf_warn_invalid_xdp_action(act);
-			/* fallthrough */
 		case XDP_REDIRECT:
 			err = xdp_do_redirect(xdpf->dev_rx, &xdp, rcpu->prog);
 			if (unlikely(err)) {

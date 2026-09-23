@@ -1187,7 +1187,7 @@ SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
 	    !strncmp(current->comm, "netd", 4) ||
 	    !strncmp(current->comm, "uprobestats", 11)) {
 		if (current_uid().val == 0) {
-			strcpy(tmp.release, "5.10.239");
+			strcpy(tmp.release, "5.15.200");
 			pr_debug("fake uname: %s/%d release=%s\n",
 				 current->comm, current->pid, tmp.release);
 		}

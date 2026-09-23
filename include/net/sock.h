@@ -152,6 +152,16 @@ typedef __u64 __bitwise __addrpair;
  *	This is the minimal network layer representation of sockets, the header
  *	for struct sock and struct inet_timewait_sock.
  */
+
+struct sock; /* Forward declaration so compiler knows 'struct sock' exists */
+
+#ifndef HAVE_SOCK_GEN_COOKIE
+static inline u64 sock_gen_cookie(struct sock *sk)
+{
+	return (u64)(uintptr_t)sk;
+}
+#endif
+
 struct sock_common {
 	/* skc_daddr and skc_rcv_saddr must be grouped on a 8 bytes aligned
 	 * address on 64bit arches : cf INET_MATCH()
@@ -2535,6 +2545,10 @@ sk_is_refcounted(struct sock *sk)
  * @skb to steal the socket from
  * @refcounted is set to true if the socket is reference-counted
  */
+
+u64 __sock_gen_cookie(struct sock *sk);
+u64 sock_gen_cookie(struct sock *sk);
+
 static inline struct sock *
 skb_steal_sock(struct sk_buff *skb, bool *refcounted)
 {

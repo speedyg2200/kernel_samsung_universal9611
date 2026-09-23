@@ -25,6 +25,7 @@
 
 #include <generated/autoconf.h>
 #undef CONFIG_64BIT
+#include <linux/types.h>	/* for u32 & u64	*/
 #include <asm/barrier.h>	/* for isb() & dmb()	*/
 #include <asm/param.h>		/* for HZ		*/
 #include <asm/unistd32.h>

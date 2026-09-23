@@ -76,6 +76,29 @@ struct pid_namespace init_pid_ns = {
 };
 EXPORT_SYMBOL_GPL(init_pid_ns);
 
+struct pid *pidfd_get_pid(int fd, unsigned int *flags)
+{
+	struct fd f = fdget(fd);
+	struct pid *pid;
+
+	if (!f.file)
+		return ERR_PTR(-EBADF);
+
+	/* Preluăm struct pid direct din private_data al fișierului pidfd */
+	pid = f.file->private_data;
+	if (pid) {
+		get_pid(pid);
+		if (flags)
+			*flags = f.file->f_flags;
+	} else {
+		pid = ERR_PTR(-EINVAL);
+	}
+
+	fdput(f);
+	return pid;
+}
+EXPORT_SYMBOL_GPL(pidfd_get_pid);
+
 /*
  * Note: disable interrupts while the pidmap_lock is held as an
  * interrupt might come in and do read_lock(&tasklist_lock).
@@ -471,9 +494,3 @@ void __init pid_idr_init(void)
 	init_pid_ns.pid_cachep = KMEM_CACHE(pid,
 			SLAB_HWCACHE_ALIGN | SLAB_PANIC | SLAB_ACCOUNT);
 }
-
-struct pid *pidfd_get_pid(int fd, unsigned int *flags)
-{
-	return ERR_PTR(-EOPNOTSUPP);
-}
-EXPORT_SYMBOL_GPL(pidfd_get_pid);

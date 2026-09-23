@@ -24,8 +24,11 @@
 
 #include <linux/version.h>
 
-#if KERNEL_VERSION(4, 16, 0) >= LINUX_VERSION_CODE
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0)
+#ifndef __poll_t
 typedef unsigned int __poll_t;
+#define __poll_t __poll_t
+#endif
 #endif
 
 #endif /* _VERSION_COMPAT_DEFS_H_ */

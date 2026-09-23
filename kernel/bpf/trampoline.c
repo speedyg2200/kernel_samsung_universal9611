@@ -226,9 +226,9 @@ static int bpf_trampoline_update(struct bpf_trampoline *tr)
 	 */
 	synchronize_rcu_mult(call_rcu_tasks, call_rcu_tasks_trace);
 
-	err = arch_prepare_bpf_trampoline(im, im->image, im->image + PAGE_SIZE / 2,
-					  &tr->func.model, flags, tprogs,
-					  tr->func.addr);
+	err = arch_prepare_bpf_trampoline(new_image, new_image + PAGE_SIZE / 2,
+                      &tr->func.model, flags, tprogs,
+				      tr->func.addr);
 	if (err < 0)
 		goto out;
 
