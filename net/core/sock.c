@@ -1802,6 +1802,11 @@ struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
 		sk->sk_prot = sk->sk_prot_creator = prot;
 		sk->sk_kern_sock = kern;
 		sock_lock_init(sk);
+
+#ifdef CONFIG_BPF_SYSCALL
+		RCU_INIT_POINTER(sk->sk_bpf_storage, NULL);
+#endif
+
 		sk->sk_net_refcnt = kern ? 0 : 1;
 		if (likely(sk->sk_net_refcnt))
 			get_net(net);

@@ -352,6 +352,9 @@ struct sock {
 #ifdef CONFIG_XPS
 #define sk_rx_queue_mapping	__sk_common.skc_rx_queue_mapping
 #endif
+#ifdef CONFIG_BPF_SYSCALL
+	struct bpf_local_storage __rcu	*sk_bpf_storage;
+#endif
 
 #define sk_dontcopy_begin	__sk_common.skc_dontcopy_begin
 #define sk_dontcopy_end		__sk_common.skc_dontcopy_end
@@ -511,9 +514,6 @@ struct sock {
 						  struct sk_buff *skb);
 	void                    (*sk_destruct)(struct sock *sk);
 	struct sock_reuseport __rcu	*sk_reuseport_cb;
-#ifdef CONFIG_BPF_SYSCALL
-	struct bpf_local_storage __rcu	*sk_bpf_storage;
-#endif
 	struct rcu_head		sk_rcu;
 };
 

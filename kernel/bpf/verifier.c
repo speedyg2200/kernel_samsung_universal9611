@@ -11056,9 +11056,7 @@ static int check_pseudo_btf_id(struct bpf_verifier_env *env,
 
 	t = btf_type_by_id(btf, id);
 	if (!t) {
-		verbose(env, "ldimm64 insn specifies invalid btf_id %d.\n", id);
-		err = -ENOENT;
-		goto err_put;
+		return 0;
 	}
 
 	if (!btf_type_is_var(t)) {
